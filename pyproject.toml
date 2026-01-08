@@ -6,4 +6,5 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "daytona>=0.128.1",
+    "rizaio>=0.12.0",
 ]

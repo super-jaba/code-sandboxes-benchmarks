@@ -1,0 +1,60 @@
+import asyncio
+import os
+import time
+
+# Fix SSL certificate verification on macOS
+# This ensures Python can verify SSL certificates by using certifi's certificate bundle
+try:
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+except ImportError:
+    pass  # certifi not available, will use system defaults
+
+from daytona import AsyncDaytona, DaytonaConfig
+
+from programs import PROGRAMS
+
+# Define the configuration
+config = DaytonaConfig(
+    api_key="dtn_e686a90966de9489d3a4ede98d963dc364296be06ead308a3c3b1c249a1da663",
+    api_url="http://localhost:3000/api"
+)
+
+daytona = AsyncDaytona(config)
+
+async def run_program(program: str, expected: str) -> tuple[str, str, str]:
+    start_time = time.perf_counter()
+    try:
+        sandbox = await daytona.create()   
+        response = await sandbox.process.code_run(program)
+        if response.exit_code != 0:
+            print(f"Error: {response.exit_code} {response.result}")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        await daytona.delete(sandbox)
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    return program, response.result, expected, elapsed_ms
+
+async def main():
+    results = await asyncio.gather(*[run_program(program, expected) for program, expected in PROGRAMS])
+    for program, result, expected, _elapsed_ms in results:
+        if result != expected:
+            print("Error!")
+            print(f"Program: {program}")
+            print(f"Result: {result}")
+            print(f"Expected: {expected}")
+            print("--------------------------------")
+
+    print(f"Average execution time: {sum([elapsed_ms for _, _, _, elapsed_ms in results]) / len(results):.2f} ms")
+
+    await daytona.close()
+
+
+if __name__ == "__main__":
+    start_time = time.perf_counter()
+    asyncio.run(main())
+    end_time = time.perf_counter()
+    total_time = end_time - start_time
+    print(f"\nTotal execution time: {total_time:.2f} seconds")
